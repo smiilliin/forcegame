@@ -48,6 +48,8 @@ class Vector2 {
   }
 }
 
+let worldscale = 15;
+
 class Pointer extends PIXI.Graphics {
   vector: Vector2;
   r: number;
@@ -55,12 +57,22 @@ class Pointer extends PIXI.Graphics {
   constructor(vector: Vector2, r: number) {
     super();
     this.beginFill(0xffffff);
-    this.drawCircle(0, 0, 8);
+    this.drawCircle(0, 0, worldscale / 2);
     this.endFill();
     this.vector = vector.clone();
     this.r = r;
-    this.x = vector.x * 10;
-    this.y = -vector.y * 10;
+    this.x = vector.x * worldscale;
+    this.y = -vector.y * worldscale;
+  }
+  update() {
+    this.x = this.vector.x * worldscale;
+    this.y = -this.vector.y * worldscale;
+  }
+  draw() {
+    this.clear();
+    this.beginFill(0xffffff);
+    this.drawCircle(0, 0, worldscale / 2);
+    this.endFill();
   }
 }
 
@@ -73,21 +85,21 @@ class Ball extends PIXI.Container {
   p: Pointer | null;
   m: number;
   v_vector: PIXI.Graphics;
+  thread: PIXI.Graphics;
+  ball: PIXI.Graphics;
+  afterimages: PIXI.Graphics[];
 
   constructor() {
     super();
-    const ball = new PIXI.Graphics();
 
-    ball.beginFill(0xffffff);
-    ball.drawCircle(0, 0, 6);
-    ball.endFill();
-    this.addChild(ball);
+    this.ball = new PIXI.Graphics();
+    this.addChild(this.ball);
 
     this.v_vector = new PIXI.Graphics();
-    this.v_vector.lineStyle(2, 0xff0000);
-    this.v_vector.moveTo(0, 0);
-    this.v_vector.lineTo(10, 0);
     this.addChild(this.v_vector);
+
+    this.thread = new PIXI.Graphics();
+    this.addChild(this.thread);
 
     this.theta = 0;
     this.p = null;
@@ -98,6 +110,37 @@ class Ball extends PIXI.Container {
     this.v_r = 0;
 
     this.E = (1 / 2) * this.m * Math.pow(this.v.norm(), 2);
+
+    const afterimages_n = 10;
+    this.afterimages = [];
+    for (let i = 0; i < afterimages_n; i++) {
+      const graphic = new PIXI.Graphics();
+      this.afterimages.push(graphic);
+      graphic.alpha = i / (afterimages_n - 1);
+      view.addChild(graphic);
+    }
+
+    this.draw();
+  }
+  draw() {
+    this.ball.clear();
+    this.ball.beginFill(0xffffff);
+    this.ball.drawCircle(0, 0, worldscale / 3);
+    this.ball.endFill();
+
+    this.afterimages.forEach((graphic, i) => {
+      graphic.clear();
+      graphic.beginFill(0xffffff);
+      graphic.drawCircle(
+        0,
+        0,
+        (worldscale / 3) * (i / (this.afterimages.length - 1))
+      );
+      graphic.endFill();
+    });
+  }
+  remove() {
+    this.afterimages.forEach((afterimage) => view.removeChild(afterimage));
   }
   join(p: Pointer) {
     this.p = p;
@@ -108,10 +151,9 @@ class Ball extends PIXI.Container {
     this.vector = new Vector2(Math.cos(this.theta), Math.sin(this.theta))
       .mul(this.p.r)
       .add(this.p.vector);
-    console.log(this.vector.x, this.vector.y);
-    // const v_u = new Vector2(Math.sin(this.theta), -Math.cos(this.theta));
-    // this.v = v_u.mul(this.v.norm());
-    // this.v_r = this.v.norm() / p.r;
+    const v_u = new Vector2(-Math.sin(this.theta), Math.cos(this.theta));
+    this.v = v_u.mul(this.v.norm());
+    this.v_r = this.v.norm() / p.r;
 
     this.E =
       this.m * g * this.vector.y +
@@ -124,58 +166,103 @@ class Ball extends PIXI.Container {
       .normalize()
       .mul(g)
       .sub(new Vector2(0, g));
-    const v_u = new Vector2(Math.sin(this.theta), -Math.cos(this.theta));
+    const v_u = new Vector2(-Math.sin(this.theta), Math.cos(this.theta));
+    this.v = v_u.mul(Math.sign(v_u.dot(this.v)) * this.v.norm());
     this.v = this.v.add(a.mul(dt));
-    this.v_r = (v_u.dot(this.v.div(this.v.norm())) * this.v.norm()) / this.p.r;
-    // console.log(this.v.x, this.v.y);
-    // this.v_vector.rotation = Math.PI / 2;
 
-    this.v_vector.clear();
-    this.v_vector.lineStyle(2, 0xff0000);
-    this.v_vector.moveTo(0, 0);
-    this.v_vector.lineTo(v_u.x * 10, -v_u.y * 10);
-
-    // console.log(v_u.dot(this.v.div(this.v.norm())));
+    this.v_r = (Math.sign(v_u.dot(this.v)) * this.v.norm()) / this.p.r;
     this.theta += this.v_r * dt;
-    // this.v_vector.rotation = -(this.theta);
-    this.vector = new Vector2(Math.cos(this.theta), Math.sin(this.theta))
-      .mul(this.p.r)
-      .add(this.p.vector);
+
     let Ek = this.E - this.m * g * this.vector.y;
     if (Ek < 0) {
       Ek = 0;
     }
-    // console.log(Ek);
-    this.v = this.v.div(this.v.norm()).mul(Math.sqrt((2 * Ek) / this.m));
-    // this.v_r = this.v.norm() / this.p.r;
+    this.v = this.v.normalize().mul(Math.sqrt((2 * Ek) / this.m));
 
-    // console.log(this.theta);
-    this.x = this.vector.x * 10;
-    this.y = -this.vector.y * 10;
+    this.v_vector.clear();
+    this.v_vector.lineStyle(worldscale / 10, 0xff0000);
+    this.v_vector.moveTo(0, 0);
+    this.v_vector.lineTo(this.v.x * worldscale, -this.v.y * worldscale);
+
+    this.vector = new Vector2(Math.cos(this.theta), Math.sin(this.theta))
+      .mul(this.p.r)
+      .add(this.p.vector);
+
+    this.thread.clear();
+    this.thread.lineStyle(worldscale / 10, 0xffffff);
+    this.thread.moveTo(0, 0);
+    this.thread.lineTo(
+      -this.p.r * Math.cos(this.theta) * worldscale,
+      this.p.r * Math.sin(this.theta) * worldscale
+    );
+
+    this.x = this.vector.x * worldscale;
+    this.y = -this.vector.y * worldscale;
+
+    this.afterimages.forEach((img, i) => {
+      if (i == this.afterimages.length - 1) {
+        img.x = this.x;
+        img.y = this.y;
+      } else {
+        img.x = this.afterimages[i + 1].x;
+        img.y = this.afterimages[i + 1].y;
+      }
+    });
   }
 }
 
 const g = 9.8;
 
-const p = new Pointer(new Vector2(3, 3), 4);
+const p = new Pointer(new Vector2(0, 0), 20);
+const p2 = new Pointer(new Vector2(20, 20), 20);
+const p3 = new Pointer(new Vector2(-25, -10), 20);
 const ball = new Ball();
-ball.vector.x = 10;
-ball.vector.y = 10;
+const ball2 = new Ball();
+const ball3 = new Ball();
+ball.vector.x = -0.5;
+ball.vector.y = 2;
 
 ball.join(p);
+ball2.join(p2);
+ball3.join(p3);
 
 view.addChild(p);
+view.addChild(p2);
+view.addChild(p3);
 view.addChild(ball);
+view.addChild(ball2);
+view.addChild(ball3);
 view.x = window.innerWidth / 2;
 view.y = window.innerHeight / 2;
 
+window.onresize = () => {
+  view.x = window.innerWidth / 2;
+  view.y = window.innerHeight / 2;
+};
+
+const startTime = Date.now();
 let lastTime = Date.now();
 app.ticker.add(() => {
   const currentTime = Date.now();
   let dt = (currentTime - lastTime) / 1000;
+  if (dt > 0.1) dt = 0.1;
 
   ball.update(dt);
-  // console.log(ball.v);
+  ball2.update(dt);
+  ball3.update(dt);
+
+  // worldscale = (15 / 2) * (1 + Math.cos((currentTime - startTime) / 200));
+  // worldscale = Math.max(Math.min(15, worldscale), 10);
+
+  ball.draw();
+  ball2.draw();
+  ball3.draw();
+  p.update();
+  p2.update();
+  p3.update();
+  p.draw();
+  p2.draw();
+  p3.draw();
 
   lastTime = currentTime;
 });
