@@ -43,6 +43,9 @@ class Vector2 {
   normalize() {
     return this.div(this.norm());
   }
+  inverse() {
+    return new Vector2(-this.x, -this.y);
+  }
   clone(): Vector2 {
     return new Vector2(this.x, this.y);
   }
@@ -56,13 +59,10 @@ class Pointer extends PIXI.Graphics {
 
   constructor(vector: Vector2, r: number) {
     super();
-    this.beginFill(0xffffff);
-    this.drawCircle(0, 0, worldscale / 2);
-    this.endFill();
     this.vector = vector.clone();
     this.r = r;
-    this.x = vector.x * worldscale;
-    this.y = -vector.y * worldscale;
+    this.update();
+    this.draw();
   }
   update() {
     this.x = this.vector.x * worldscale;
@@ -75,9 +75,58 @@ class Pointer extends PIXI.Graphics {
     this.endFill();
   }
 }
+class Line extends PIXI.Graphics {
+  p0: Vector2;
+  p1: Vector2;
+  d: Vector2;
+  L: number;
+
+  constructor(p0: Vector2, d: Vector2, L: number) {
+    super();
+    this.p0 = p0.clone();
+    this.d = d.clone();
+    this.L = L;
+    this.p1 = p0.add(d.mul(L));
+
+    this.update();
+    this.draw();
+  }
+  update() {
+    this.x = this.p0.x * worldscale;
+    this.y = -this.p0.y * worldscale;
+  }
+  draw() {
+    let p = this.p1.sub(this.p0).mul(worldscale);
+    this.clear();
+    this.lineStyle(worldscale / 6, 0xffffff);
+    this.moveTo(0, 0);
+    this.lineTo(p.x, -p.y);
+  }
+  isCollide(ball: Ball): boolean {
+    const p = ball.vector;
+    const r = ball.r;
+    const D =
+      Math.abs(
+        this.d.y * p.x -
+          this.d.x * p.y -
+          this.d.y * this.p0.x +
+          this.d.x * this.p0.y
+      ) / Math.sqrt(this.d.x * this.d.x + this.d.y * this.d.y);
+
+    if (D > r) return false;
+
+    const D1 = Math.sqrt(Math.pow(p.sub(this.p0).norm(), 2) - D * D) <= this.L;
+    const D2 = Math.sqrt(Math.pow(p.sub(this.p1).norm(), 2) - D * D) <= this.L;
+    const D3 = p.sub(this.p0).norm() <= r;
+    const D4 = p.sub(this.p1).norm() <= r;
+
+    return (D1 && D2) || D3 || D4;
+  }
+}
 
 class Ball extends PIXI.Container {
   vector: Vector2;
+  r: number;
   E: number;
   theta: number;
   v: Vector2;
@@ -91,6 +140,8 @@ class Ball extends PIXI.Container {
 
   constructor() {
     super();
+
+    this.r = 1 / 3;
 
     this.ball = new PIXI.Graphics();
     this.addChild(this.ball);
@@ -125,7 +176,7 @@ class Ball extends PIXI.Container {
   draw() {
     this.ball.clear();
     this.ball.beginFill(0xffffff);
-    this.ball.drawCircle(0, 0, worldscale / 3);
+    this.ball.drawCircle(0, 0, this.r * worldscale);
     this.ball.endFill();
 
     this.afterimages.forEach((graphic, i) => {
@@ -159,7 +210,7 @@ class Ball extends PIXI.Container {
       this.m * g * this.vector.y +
       (1 / 2) * this.m * Math.pow(this.v.norm(), 2);
   }
-  update(dt: number) {
+  update(dt: number, lines: Line[]) {
     if (this.p == null) return;
     const a = this.p.vector
       .sub(this.vector)
@@ -208,6 +259,14 @@ class Ball extends PIXI.Container {
         img.y = this.afterimages[i + 1].y;
       }
     });
+
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].isCollide(this)) {
+        this.v = this.v.inverse();
+
+        break;
+      }
+    }
   }
 }
 
@@ -219,6 +278,22 @@ const p3 = new Pointer(new Vector2(-25, -10), 20);
 const ball = new Ball();
 const ball2 = new Ball();
 const ball3 = new Ball();
+
+const line = new Line(
+  new Vector2(0, -22),
+  new Vector2(Math.cos(Math.PI / 6), Math.sin(Math.PI / 6)),
+  5
+);
+const line2 = new Line(
+  new Vector2(-6, -12),
+  new Vector2(Math.cos(Math.PI / 3), Math.sin(Math.PI / 3)),
+  5
+);
+
+view.addChild(line);
+view.addChild(line2);
+const lines = [line, line2];
+
 ball.vector.x = -0.5;
 ball.vector.y = 2;
 
@@ -247,19 +322,21 @@ app.ticker.add(() => {
   let dt = (currentTime - lastTime) / 1000;
   if (dt > 0.1) dt = 0.1;
 
-  ball.update(dt);
-  ball2.update(dt);
-  ball3.update(dt);
+  ball.update(dt, lines);
+  ball2.update(dt, lines);
+  ball3.update(dt, lines);
 
   // worldscale = (15 / 2) * (1 + Math.cos((currentTime - startTime) / 200));
   // worldscale = Math.max(Math.min(15, worldscale), 10);
 
+  // console.log(ball3.vector);
+  // console.log(line2.isCollide(ball3));
   ball.draw();
   ball2.draw();
   ball3.draw();
-  p.update();
-  p2.update();
-  p3.update();
+  // p.update();
+  // p2.update();
+  // p3.update();
   p.draw();
   p2.draw();
   p3.draw();
