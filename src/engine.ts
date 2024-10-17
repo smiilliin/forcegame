@@ -65,12 +65,12 @@ class Line extends PIXI.Graphics {
   d: Vector2;
   L: number;
 
-  constructor(p0: Vector2, d: Vector2, L: number) {
+  constructor(p0: Vector2, theta: number, L: number) {
     super();
     this.p0 = p0.clone();
-    this.d = d.clone();
+    this.d = new Vector2(Math.cos(theta), Math.sin(theta));
     this.L = L;
-    this.p1 = p0.add(d.mul(L));
+    this.p1 = p0.add(this.d.mul(L));
 
     this.update();
     this.draw();
