@@ -113,6 +113,7 @@ class Ball extends PIXI.Container {
   thread_r: number;
   r: number;
   E: number;
+  EE: number;
   theta: number;
   v: Vector2;
   v_r: number;
@@ -121,9 +122,12 @@ class Ball extends PIXI.Container {
   thread: PIXI.Graphics;
   ball: PIXI.Graphics;
   afterimages: PIXI.Graphics[];
+  color: PIXI.ColorSource;
 
   constructor(vector: Vector2, view: PIXI.Container, v?: Vector2) {
     super();
+    this.color = 0xffffff;
+    this.EE = 0;
 
     this.thread_r = 0;
     this.r = 1 / 3;
@@ -159,13 +163,13 @@ class Ball extends PIXI.Container {
   }
   draw() {
     this.ball.clear();
-    this.ball.beginFill(0xffffff);
-    this.ball.drawCircle(0, 0, this.thread_r * worldscale);
+    this.ball.beginFill(this.color);
+    this.ball.drawCircle(0, 0, this.r * worldscale);
     this.ball.endFill();
 
     this.afterimages.forEach((graphic, i) => {
       graphic.clear();
-      graphic.beginFill(0xffffff);
+      graphic.beginFill(this.color);
       graphic.drawCircle(
         0,
         0,
@@ -173,6 +177,9 @@ class Ball extends PIXI.Container {
       );
       graphic.endFill();
     });
+  }
+  dash() {
+    this.EE = 10;
   }
   remove(view: PIXI.Container) {
     this.afterimages.forEach((afterimage) => view.removeChild(afterimage));
@@ -248,7 +255,7 @@ class Ball extends PIXI.Container {
       this.v_r = (Math.sign(v_u.dot(this.v)) * this.v.norm()) / this.thread_r;
       this.theta += this.v_r * dt;
 
-      let Ek = this.E - this.m * g * this.vector.y;
+      let Ek = this.EE + this.E - this.m * g * this.vector.y;
       if (Ek < 0) {
         Ek = 0;
       }
@@ -270,12 +277,22 @@ class Ball extends PIXI.Container {
       this.v = this.v.add(a.mul(dt));
       this.vector = this.vector.add(this.v.mul(dt));
 
-      let Ek = this.E - this.m * g * this.vector.y;
+      console.log(this.E);
+      let Ek = this.EE + this.E - this.m * g * this.vector.y;
       if (Ek < 0) {
         Ek = 0;
       }
       this.v = this.v.normalize().mul(Math.sqrt((2 * Ek) / this.m));
     }
+
+    if (this.EE > 0) {
+      const newEE = Math.max(this.EE - 0.1, 0);
+      let Ek = this.E - this.m * g * this.vector.y;
+      if (Ek >= 0) {
+        this.EE = newEE;
+      }
+    }
+    // console.log(this.EE);
 
     this.x = this.vector.x * worldscale;
     this.y = -this.vector.y * worldscale;
