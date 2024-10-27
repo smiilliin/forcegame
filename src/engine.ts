@@ -123,11 +123,13 @@ class Ball extends PIXI.Container {
   ball: PIXI.Graphics;
   afterimages: PIXI.Graphics[];
   color: PIXI.ColorSource;
+  dashE: number;
 
   constructor(vector: Vector2, view: PIXI.Container, v?: Vector2) {
     super();
     this.color = 0xffffff;
     this.EE = 0;
+    this.dashE = 100;
 
     this.thread_r = 0;
     this.r = 1 / 3;
@@ -179,7 +181,10 @@ class Ball extends PIXI.Container {
     });
   }
   dash() {
-    this.EE = 10;
+    if (this.EE != 0) return;
+    this.EE = 100;
+    this.color = [37 / 255, 156 / 255, 184 / 255];
+    this.draw();
   }
   remove(view: PIXI.Container) {
     this.afterimages.forEach((afterimage) => view.removeChild(afterimage));
@@ -190,7 +195,7 @@ class Ball extends PIXI.Container {
       this.vector.y - p.vector.y,
       this.vector.x - p.vector.x
     );
-    this.thread_r = p.vector.sub(this.vector).norm();
+    this.thread_r = p.vector.sub(this.vector).norm() || 0.01;
     this.vector = new Vector2(Math.cos(this.theta), Math.sin(this.theta))
       .mul(this.thread_r)
       .add(this.p.vector);
@@ -198,10 +203,6 @@ class Ball extends PIXI.Container {
     this.v = v_u.mul(Math.sign(v_u.dot(this.v)) * this.v.norm());
 
     this.v_r = this.v.norm() / this.thread_r;
-
-    this.E =
-      this.m * g * this.vector.y +
-      (1 / 2) * this.m * Math.pow(this.v.norm(), 2);
   }
   updateE() {
     this.E =
@@ -225,11 +226,34 @@ class Ball extends PIXI.Container {
         const n1: Vector2 = new Vector2(-d.y, d.x);
         const n2: Vector2 = d;
 
+        const D0 = line.p0.sub(this.vector).norm() <= this.r;
+        const D1 = line.p1.sub(this.vector).norm() <= this.r;
+
+        if (D0) {
+          const delta = this.vector.sub(line.p0);
+          const size =
+            Math.sqrt(
+              Math.pow(this.r + 0.1, 2) -
+                (Math.pow(delta.norm(), 2) -
+                  Math.pow(delta.dot(this.v.normalize()), 2))
+            ) - delta.dot(this.v.normalize());
+          this.vector = this.vector.sub(this.v.normalize().mul(size));
+        } else if (D1) {
+          const delta = this.vector.sub(line.p1);
+          const size =
+            Math.sqrt(
+              Math.pow(this.r + 0.1, 2) -
+                (Math.pow(delta.norm(), 2) -
+                  Math.pow(delta.dot(this.v.normalize()), 2))
+            ) - delta.dot(this.v.normalize());
+          this.vector = this.vector.sub(this.v.normalize().mul(size));
+        }
+
         if (
-          (line.p0.sub(this.vector).norm() <= this.r &&
+          (D0 &&
             Math.abs(n2.dot(this.vector.sub(line.p0))) >
               Math.abs(n1.dot(this.vector.sub(line.p0)))) ||
-          (line.p1.sub(this.vector).norm() <= this.r &&
+          (D1 &&
             Math.abs(n2.dot(this.vector.sub(line.p1))) >
               Math.abs(n1.dot(this.vector.sub(line.p1))))
         ) {
@@ -237,6 +261,7 @@ class Ball extends PIXI.Container {
         } else {
           n = n1;
         }
+
         this.v = this.v.add(n.mul(this.v.inverse().dot(n)).mul(2));
         break;
       }
@@ -277,8 +302,8 @@ class Ball extends PIXI.Container {
       this.v = this.v.add(a.mul(dt));
       this.vector = this.vector.add(this.v.mul(dt));
 
-      console.log(this.E);
       let Ek = this.EE + this.E - this.m * g * this.vector.y;
+
       if (Ek < 0) {
         Ek = 0;
       }
@@ -286,13 +311,20 @@ class Ball extends PIXI.Container {
     }
 
     if (this.EE > 0) {
-      const newEE = Math.max(this.EE - 0.1, 0);
+      const newEE = Math.max(this.EE - 2, 0);
       let Ek = this.E - this.m * g * this.vector.y;
       if (Ek >= 0) {
         this.EE = newEE;
       }
+
+      let r = 1 - this.EE / this.dashE;
+      this.color = [
+        (1 - 37 / 255) * r + 37 / 255,
+        (1 - 156 / 255) * r + 156 / 255,
+        (1 - 184 / 255) * r + 184 / 255,
+      ];
+      this.draw();
     }
-    // console.log(this.EE);
 
     this.x = this.vector.x * worldscale;
     this.y = -this.vector.y * worldscale;
