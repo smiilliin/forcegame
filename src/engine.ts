@@ -1,4 +1,5 @@
 import * as PIXI from "pixi.js";
+import { Game } from "./game";
 
 class Vector2 {
   x: number;
@@ -124,12 +125,15 @@ class Ball extends PIXI.Container {
   afterimages: PIXI.Graphics[];
   color: PIXI.ColorSource;
   dashE: number;
+  score: number;
+  id: PIXI.Text;
 
-  constructor(vector: Vector2, view: PIXI.Container, v?: Vector2) {
+  constructor(vector: Vector2, view: PIXI.Container, id?: string, v?: Vector2) {
     super();
     this.color = 0xffffff;
     this.EE = 0;
     this.dashE = 100;
+    this.score = 0;
 
     this.thread_r = 0;
     this.r = 1 / 3;
@@ -139,6 +143,12 @@ class Ball extends PIXI.Container {
 
     this.thread = new PIXI.Graphics();
     this.addChild(this.thread);
+
+    this.id = new PIXI.Text(id, { fill: 0xffffff, fontSize: 15 });
+    this.id.anchor.set(0.5, 0);
+    this.id.x = 0;
+    this.id.y = -(this.r + 0.5) * worldscale;
+    this.addChild(this.id);
 
     this.theta = 0;
     this.p = null;
@@ -168,6 +178,8 @@ class Ball extends PIXI.Container {
     this.ball.beginFill(this.color);
     this.ball.drawCircle(0, 0, this.r * worldscale);
     this.ball.endFill();
+
+    this.id.y = -(this.r + 0.5) * worldscale;
 
     this.afterimages.forEach((graphic, i) => {
       graphic.clear();
@@ -213,7 +225,33 @@ class Ball extends PIXI.Container {
     this.p = null;
     this.thread.clear();
   }
-  update(dt: number, lines: Line[]) {
+  die() {
+    this.vector = new Vector2(0, 25);
+    this.detach();
+    this.EE = 0;
+    this.v = new Vector2(0, 0);
+  }
+  update(dt: number, game: Game) {
+    const lines = game.lines;
+    const deathdots = game.deathdots;
+    const scoredots = game.scoredots;
+
+    if (this.vector.y < -10) {
+      this.die();
+    }
+    for (let i = 0; i < deathdots.length; i++) {
+      const dot = deathdots[i];
+      if (this.vector.sub(dot.vector).norm() <= this.r + dot.r) {
+        this.die();
+      }
+    }
+    scoredots.forEach((dot) => {
+      if (!dot.hidden && this.vector.sub(dot.vector).norm() <= this.r + dot.r) {
+        this.score += dot.score;
+        game.scoredotHide(dot);
+      }
+    });
+
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       if (line.isCollide(this)) {
@@ -340,6 +378,51 @@ class Ball extends PIXI.Container {
     });
   }
 }
+class DeathDot extends PIXI.Graphics {
+  vector: Vector2;
+  r: number;
+
+  constructor(vector: Vector2, r: number) {
+    super();
+    this.vector = vector.clone();
+    this.r = r;
+
+    this.beginFill(0xbb5555);
+    this.drawCircle(0, 0, r * worldscale);
+    this.endFill();
+
+    this.x = vector.x * worldscale;
+    this.y = -vector.y * worldscale;
+  }
+}
+class ScoreDot extends PIXI.Graphics {
+  vector: Vector2;
+  r: number;
+  score: number;
+  hidden: boolean;
+
+  constructor(vector: Vector2, score: number) {
+    super();
+    this.vector = vector.clone();
+    score = Math.floor(score);
+    this.r = score / 200;
+    this.score = score;
+    this.hidden = false;
+
+    this.beginFill(0x55bb55);
+    this.drawCircle(0, 0, this.r * worldscale);
+    this.endFill();
+
+    this.x = vector.x * worldscale;
+    this.y = -vector.y * worldscale;
+  }
+  hide() {
+    if (!this.hidden) {
+      this.hidden = true;
+      this.clear();
+    }
+  }
+}
 
 const g = 9.8;
 
@@ -347,4 +430,13 @@ function setWorldScale(s: number) {
   worldscale = s;
 }
 
-export { Vector2, Ball, Line, Pointer, setWorldScale, worldscale };
+export {
+  Vector2,
+  Ball,
+  Line,
+  Pointer,
+  DeathDot,
+  ScoreDot,
+  setWorldScale,
+  worldscale,
+};

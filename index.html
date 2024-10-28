@@ -23,8 +23,60 @@
         height: 100%;
         display: block;
       }
+      #container {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%,-50%);
+      }
+      #mode {
+        display: flex;
+        flex-direction: column;
+        gap: 30px;
+        align-items: center;
+      }
+      button {
+        background-color: transparent;
+        color: white;
+        width: 120px;
+        height: 50px;
+        cursor: pointer;
+        border: none;
+        border-radius: 20px;
+        font-weight: 500;
+        font-size: 23px;
+      }
+      button:hover {
+        background-color: white;
+        color: black;
+      }
+      #end {
+        flex-direction: column;
+        display: flex;
+        gap: 20px;
+      }
+      #score {
+        font-size: 30px;
+        font-weight: 600;
+        text-align: center;
+      }
+      #forcegame {
+        font-weight: 600;
+        font-size: 50px;
+        text-align: center;
+      }
     </style>
     <script src="./bundle.js" async></script>
+    <div id="container">
+      <div id="mode">
+        <p id="forcegame">Forcegame</p>
+        <button id="solo">시작</button>
+      </div>
+      <div id="end" style="display:none">
+        <p id="score"></p>
+        <button id="retry">다시 시작</button>
+      </div>
+    </div>
   </head>
   <body></body>
 </html>
